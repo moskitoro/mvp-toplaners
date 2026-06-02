@@ -202,13 +202,20 @@ export default function Home() {
   useEffect(() => {
     if (j1 && j2 && !analisisId && !loadingIA) {
       setLoadingIA(true)
-      // Obtenemos IA sin guardar en BD
       const [name1, tag1] = j1.riotId.split('#')
       const [name2, tag2] = j2.riotId.split('#')
       const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
       const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
-      // Guardamos en BD para obtener el ID del análisis y poder pedir IA
-      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(async res => {
+      const minP = Math.min(j1.partidasAnalizadas, j2.partidasAnalizadas)
+      // Pasamos métricas del frontend para que la IA use los mismos datos que se ven en pantalla
+      crearAnalisis(
+        `${name1}#${tag1}`, r1,
+        `${name2}#${tag2}`, r2,
+        undefined,
+        { ...j1.metricas, puuid: j1.puuid, partidasAnalizadas: j1.partidasAnalizadas },
+        { ...j2.metricas, puuid: j2.puuid, partidasAnalizadas: j2.partidasAnalizadas },
+        minP
+      ).then(async res => {
         if (res && !res.error) {
           setAnalisisId(res.id)
           const ia = await getAnalisisIA(res.id)
