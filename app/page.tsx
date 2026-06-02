@@ -1,22 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { buscarJugador, crearAnalisis, getHistorialAnalisis, getAnalisisIA } from '@/lib/actions'
+import { buscarJugador, crearAnalisis, getHistorialAnalisis, getAnalisisIA, eliminarAnalisis } from '@/lib/actions'
 import { REGIONS } from '@/lib/riot'
+import type { Jugador, AnalisisGuardado } from '@/lib/types'
 
 const REGION_OPTIONS = Object.entries(REGIONS).map(([key, val]) => ({ key, label: val.label }))
 
 type Metricas = {
   kdaAvg: number; winrate: number; dmgShareAvg: number
   killParticipationAvg: number; visionScorePerMin: number; topgapScore: number
-}
-type Jugador = {
-  puuid: string; riotId: string; region: string
-  partidasAnalizadas: number; metricas: Metricas
-}
-type AnalisisGuardado = {
-  id: number; titulo: string; creado_en: string
-  ganador_nombre: string; diferencia: number; partidas_n: number
 }
 
 const DIMENSIONES = [
@@ -85,8 +78,23 @@ function BuscadorJugador({ label, onResult, accentClass, cache, setCache, otroJu
     clearInterval(iv); setPaso(PASOS.length - 1)
     await new Promise(r => setTimeout(r, 300))
     setLoading(false)
-    if (res.error) { setError(res.error); return }
-    setCache(prev => ({ ...prev, [cacheKey]: res }))
+
+    if (res.error) {
+      // Fix 3: mensaje amigable para invocador no encontrado
+      if (
+        res.status === 404 ||
+        res.error?.includes('404') ||
+        res.error?.toLowerCase().includes('no encontrad') ||
+        res.error?.toLowerCase().includes('not found')
+      ) {
+        setError('No se encontró al usuario')
+      } else {
+        setError(res.error)
+      }
+      return
+    }
+
+    setCache((prev: Record<string, Jugador>) => ({ ...prev, [cacheKey]: res }))
     onResult(res)
   }
 
@@ -170,7 +178,7 @@ export default function Home() {
   const [j1, setJ1] = useState<Jugador | null>(null)
   const [j2, setJ2] = useState<Jugador | null>(null)
   const [guardando, setGuardando] = useState(false)
-  const [analisisId, setAnalisisId] = useState<number | null>(null)
+  const [analisisGuardado, setAnalisisGuardado] = useState(false)
   const [historial, setHistorial] = useState<AnalisisGuardado[]>([])
   const [showHistorial, setShowHistorial] = useState(false)
   const [iaResult, setIaResult] = useState<any>(null)
@@ -182,9 +190,16 @@ export default function Home() {
     setHistorial(data)
   }
 
+  // Fix 2: userEmail en dependencias — espera a que la sesión esté lista
+  useEffect(() => {
+    if (userEmail) {
+      cargarHistorial()
+    }
+  }, [userEmail])
+
   // Cuando ambos jugadores estén listos → guardar análisis en BD
   useEffect(() => {
-    if (j1 && j2 && !analisisId && !guardando) {
+    if (j1 && j2 && !analisisGuardado && !guardando) {
       setGuardando(true)
       const [name1, tag1] = j1.riotId.split('#')
       const [name2, tag2] = j2.riotId.split('#')
@@ -192,7 +207,9 @@ export default function Home() {
       const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
       crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(async res => {
         if (res && !res.error) {
-          setAnalisisId(res.id)
+          setAnalisisGuardado(true)
+          // Fix 4a: recargar historial inmediatamente tras guardar
+          cargarHistorial()
           // Pedir análisis IA automáticamente
           setLoadingIA(true)
           const ia = await getAnalisisIA(res.id)
@@ -200,12 +217,17 @@ export default function Home() {
           setLoadingIA(false)
         }
         setGuardando(false)
-        cargarHistorial()
       })
     }
   }, [j1, j2])
 
-  useEffect(() => { cargarHistorial() }, [])
+  // Fix 5: eliminar análisis del historial
+  const handleEliminar = async (id: number) => {
+    const ok = await eliminarAnalisis(id)
+    if (ok) {
+      setHistorial(prev => prev.filter(a => a.id !== id))
+    }
+  }
 
   const minPartidas = j1 && j2 ? Math.min(j1.partidasAnalizadas, j2.partidasAnalizadas) : null
   const veredicto = j1 && j2
@@ -222,7 +244,7 @@ export default function Home() {
 
         <div className="flex items-center justify-between pt-2">
           <h1 className="text-zinc-600 text-xs uppercase tracking-[0.3em] font-bold">Gap Analysis · Top Lane</h1>
-          <button onClick={() => { setShowHistorial(!showHistorial); cargarHistorial() }}
+          <button onClick={() => { setShowHistorial(!showHistorial); if (!showHistorial) cargarHistorial() }}
             className="text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-widest border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors">
             {showHistorial ? 'Ocultar historial' : `Historial (${historial.length})`}
           </button>
@@ -237,17 +259,27 @@ export default function Home() {
             ) : (
               <div className="space-y-2">
                 {historial.map(a => (
-                  <div key={a.id} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+                  <div key={a.id} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 group">
                     <div>
                       <p className="text-sm font-bold text-white">{a.titulo}</p>
                       <p className="text-[10px] text-zinc-600">{new Date(a.creado_en).toLocaleString('es-CO')} · {a.partidas_n} partidas</p>
                     </div>
-                    {a.ganador_nombre && (
-                      <div className="text-right">
-                        <p className="text-xs text-green-400 font-bold">{a.ganador_nombre}</p>
-                        <p className="text-[10px] text-zinc-600">+{a.diferencia} pts</p>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-4">
+                      {a.ganador_nombre && (
+                        <div className="text-right">
+                          <p className="text-xs text-green-400 font-bold">{a.ganador_nombre}</p>
+                          <p className="text-[10px] text-zinc-600">+{a.diferencia} pts</p>
+                        </div>
+                      )}
+                      {/* Fix 5: botón eliminar */}
+                      <button
+                        onClick={() => handleEliminar(a.id)}
+                        title="Eliminar análisis"
+                        className="text-zinc-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 text-sm leading-none"
+                      >
+                        🗑
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -261,7 +293,7 @@ export default function Home() {
             {j1 ? (
               <div className="space-y-4">
                 <TarjetaJugador jugador={j1} color="border-blue-800" />
-                <button onClick={() => { setJ1(null); setAnalisisId(null) }}
+                <button onClick={() => { setJ1(null); setAnalisisGuardado(false) }}
                   className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-widest">
                   Cambiar jugador
                 </button>
@@ -272,7 +304,7 @@ export default function Home() {
             {j2 ? (
               <div className="space-y-4">
                 <TarjetaJugador jugador={j2} color="border-orange-800" />
-                <button onClick={() => { setJ2(null); setAnalisisId(null) }}
+                <button onClick={() => { setJ2(null); setAnalisisGuardado(false) }}
                   className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-widest">
                   Cambiar jugador
                 </button>
@@ -293,7 +325,8 @@ export default function Home() {
                 Diferencia: {Math.abs(j1.metricas.topgapScore - j2.metricas.topgapScore)} pts · {minPartidas} partidas analizadas c/u
               </p>
               {guardando && <p className="text-[10px] text-blue-500 animate-pulse">Guardando en base de datos...</p>}
-              {analisisId && <p className="text-[10px] text-green-500">✓ Análisis #{analisisId} guardado en BD</p>}
+              {/* Fix 4b: sin número/ID correlativo */}
+              {analisisGuardado && <p className="text-[10px] text-green-500">✓ Análisis guardado en BD</p>}
             </div>
 
             <div className="space-y-4">

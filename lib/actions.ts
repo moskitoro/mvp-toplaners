@@ -67,6 +67,20 @@ export async function getReporte(id: number) {
   }
 }
 
+// ── Eliminar un análisis por ID ───────────────────────────────────────────────
+export async function eliminarAnalisis(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/analisis/${id}`, {
+      method: 'DELETE',
+      cache: 'no-store',
+    })
+    const data = await res.json()
+    return data.ok === true
+  } catch {
+    return false
+  }
+}
+
 // ── Análisis con Gemini AI ────────────────────────────────────────────────────
 export async function getAnalisisIA(id: number) {
   try {
