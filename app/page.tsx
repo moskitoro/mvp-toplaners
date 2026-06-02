@@ -179,49 +179,64 @@ export default function Home() {
   const [j2, setJ2] = useState<Jugador | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [analisisGuardado, setAnalisisGuardado] = useState(false)
+  const [analisisId, setAnalisisId] = useState<number | null>(null)
   const [historial, setHistorial] = useState<AnalisisGuardado[]>([])
   const [showHistorial, setShowHistorial] = useState(false)
   const [iaResult, setIaResult] = useState<any>(null)
   const [loadingIA, setLoadingIA] = useState(false)
   const [cache, setCache] = useState<Record<string, Jugador>>({})
 
-  const cargarHistorial = async () => {
-    const data = await getHistorialAnalisis(userEmail)
+  const cargarHistorial = async (email?: string) => {
+    const data = await getHistorialAnalisis(email ?? userEmail)
     setHistorial(data)
   }
 
-  // Fix 2: userEmail en dependencias — espera a que la sesión esté lista
+  // Cargar historial cuando la sesión esté lista
   useEffect(() => {
     if (userEmail) {
-      cargarHistorial()
+      cargarHistorial(userEmail)
     }
   }, [userEmail])
 
-  // Cuando ambos jugadores estén listos → guardar análisis en BD
+  // Cuando ambos jugadores estén listos → pedir análisis IA automáticamente (sin guardar aún)
   useEffect(() => {
-    if (j1 && j2 && !analisisGuardado && !guardando) {
-      setGuardando(true)
+    if (j1 && j2 && !analisisId && !loadingIA) {
+      setLoadingIA(true)
+      // Obtenemos IA sin guardar en BD
       const [name1, tag1] = j1.riotId.split('#')
       const [name2, tag2] = j2.riotId.split('#')
       const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
       const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
-      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2, userEmail).then(async res => {
+      // Guardamos en BD para obtener el ID del análisis y poder pedir IA
+      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(async res => {
         if (res && !res.error) {
-          setAnalisisGuardado(true)
-          // Fix 4a: recargar historial inmediatamente tras guardar
-          cargarHistorial()
-          // Pedir análisis IA automáticamente
-          setLoadingIA(true)
+          setAnalisisId(res.id)
           const ia = await getAnalisisIA(res.id)
           setIaResult(ia)
-          setLoadingIA(false)
         }
-        setGuardando(false)
+        setLoadingIA(false)
       })
     }
   }, [j1, j2])
 
-  // Fix 5: eliminar análisis del historial
+  // Guardar en historial del usuario (botón manual)
+  const handleGuardar = async () => {
+    if (!userEmail) return
+    if (!j1 || !j2) return
+    setGuardando(true)
+    const [name1, tag1] = j1.riotId.split('#')
+    const [name2, tag2] = j2.riotId.split('#')
+    const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
+    const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
+    const res = await crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2, userEmail)
+    if (res && !res.error) {
+      setAnalisisGuardado(true)
+      await cargarHistorial(userEmail)
+    }
+    setGuardando(false)
+  }
+
+  // Eliminar análisis del historial
   const handleEliminar = async (id: number) => {
     const ok = await eliminarAnalisis(id)
     if (ok) {
@@ -293,7 +308,7 @@ export default function Home() {
             {j1 ? (
               <div className="space-y-4">
                 <TarjetaJugador jugador={j1} color="border-blue-800" />
-                <button onClick={() => { setJ1(null); setAnalisisGuardado(false) }}
+                <button onClick={() => { setJ1(null); setAnalisisGuardado(false); setAnalisisId(null); setIaResult(null) }}
                   className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-widest">
                   Cambiar jugador
                 </button>
@@ -304,7 +319,7 @@ export default function Home() {
             {j2 ? (
               <div className="space-y-4">
                 <TarjetaJugador jugador={j2} color="border-orange-800" />
-                <button onClick={() => { setJ2(null); setAnalisisGuardado(false) }}
+                <button onClick={() => { setJ2(null); setAnalisisGuardado(false); setAnalisisId(null); setIaResult(null) }}
                   className="w-full text-[10px] text-zinc-600 hover:text-zinc-400 uppercase tracking-widest">
                   Cambiar jugador
                 </button>
@@ -324,8 +339,17 @@ export default function Home() {
               <p className="text-zinc-700 text-xs">
                 Diferencia: {Math.abs(j1.metricas.topgapScore - j2.metricas.topgapScore)} pts · {minPartidas} partidas analizadas c/u
               </p>
-              {guardando && <p className="text-[10px] text-blue-500 animate-pulse">Guardando en base de datos...</p>}
-              {/* Fix 4b: sin número/ID correlativo */}
+              {/* Botón manual de guardar */}
+              {!analisisGuardado && !guardando && (
+                <button
+                  onClick={handleGuardar}
+                  disabled={!userEmail}
+                  className="mt-2 px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-[11px] font-bold uppercase tracking-widest rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  💾 Guardar en mi historial
+                </button>
+              )}
+              {guardando && <p className="text-[10px] text-blue-500 animate-pulse">Guardando...</p>}
               {analisisGuardado && <p className="text-[10px] text-green-500">✓ Análisis guardado en BD</p>}
             </div>
 
