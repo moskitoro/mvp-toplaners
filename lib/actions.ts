@@ -44,10 +44,11 @@ export async function crearAnalisis(
   }
 }
 
-// ── Obtener historial de análisis guardados ───────────────────────────────────
-export async function getHistorialAnalisis() {
+// ── Obtener historial de análisis del usuario ────────────────────────────────
+export async function getHistorialAnalisis(email?: string) {
   try {
-    const res = await fetch(`${API_URL}/api/analisis`, { cache: 'no-store' })
+    if (!email) return []
+    const res = await fetch(`${API_URL}/api/analisis?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
     const data = await res.json()
     return data.ok ? data.data : []
   } catch {

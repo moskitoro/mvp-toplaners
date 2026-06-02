@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { buscarJugador, crearAnalisis, getHistorialAnalisis, getAnalisisIA } from '@/lib/actions'
 import { REGIONS } from '@/lib/riot'
 
@@ -28,8 +29,9 @@ const DIMENSIONES = [
 
 const PASOS = ['Buscando cuenta...', 'Obteniendo partidas ranked...', 'Calculando métricas...', 'Guardando en base de datos...']
 
-function BuscadorJugador({ label, onResult, accentClass }: {
+function BuscadorJugador({ label, onResult, accentClass, cache, setCache, otroJugador }: {
   label: string; onResult: (j: Jugador) => void; accentClass: string
+  cache: Record<string, Jugador>; setCache: (c: any) => void; otroJugador?: Jugador | null
 }) {
   const [riotId, setRiotId] = useState('')
   const [region, setRegion] = useState('la1')
@@ -38,14 +40,53 @@ function BuscadorJugador({ label, onResult, accentClass }: {
   const [error, setError] = useState('')
 
   const buscar = async () => {
-    if (!riotId.trim()) return
+    // Validaciones básicas
+    if (!riotId.trim()) {
+      setError('Ingresa un nombre de invocador.')
+      return
+    }
+    if (!riotId.includes('#')) {
+      setError('El formato debe ser Nombre#TAG (ej: Faker#KR1)')
+      return
+    }
+    const [nombre, tag] = riotId.split('#')
+    if (!nombre.trim() || nombre.trim().length < 2) {
+      setError('El nombre del invocador es muy corto.')
+      return
+    }
+    if (!tag.trim() || tag.trim().length < 2) {
+      setError('El TAG es inválido. Ej: Faker#KR1')
+      return
+    }
+    // Validar duplicado vs el otro slot
+    if (otroJugador) {
+      const [otroNombre] = otroJugador.riotId.split('#')
+      const [nuevoNombre] = riotId.trim().split('#')
+      if (otroNombre.toLowerCase() === nuevoNombre.toLowerCase() &&
+          otroJugador.region === (REGIONS[region]?.label ?? region)) {
+        setError('Este jugador ya está en el otro slot. Elige un oponente diferente.')
+        return
+      }
+    }
+
     setLoading(true); setError(''); setPaso(0)
     const iv = setInterval(() => setPaso(p => p < PASOS.length - 1 ? p + 1 : p), 2500)
+    const cacheKey = `${riotId.trim().toLowerCase()}#${region}`
+
+    // Si ya fue analizado antes, reutilizar resultado (ahorra requests a Riot)
+    if (cache[cacheKey]) {
+      clearInterval(iv)
+      setLoading(false)
+      onResult(cache[cacheKey])
+      return
+    }
+
     const res = await buscarJugador(riotId.trim(), region) as any
     clearInterval(iv); setPaso(PASOS.length - 1)
     await new Promise(r => setTimeout(r, 300))
     setLoading(false)
     if (res.error) { setError(res.error); return }
+    setCache(prev => ({ ...prev, [cacheKey]: res }))
     onResult(res)
   }
 
@@ -124,6 +165,8 @@ function BarraComparacion({ dim, v1, v2 }: { dim: typeof DIMENSIONES[0]; v1: num
 }
 
 export default function Home() {
+  const { data: session } = useSession()
+  const userEmail = session?.user?.email ?? undefined
   const [j1, setJ1] = useState<Jugador | null>(null)
   const [j2, setJ2] = useState<Jugador | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -132,9 +175,10 @@ export default function Home() {
   const [showHistorial, setShowHistorial] = useState(false)
   const [iaResult, setIaResult] = useState<any>(null)
   const [loadingIA, setLoadingIA] = useState(false)
+  const [cache, setCache] = useState<Record<string, Jugador>>({})
 
   const cargarHistorial = async () => {
-    const data = await getHistorialAnalisis()
+    const data = await getHistorialAnalisis(userEmail)
     setHistorial(data)
   }
 
@@ -222,7 +266,7 @@ export default function Home() {
                   Cambiar jugador
                 </button>
               </div>
-            ) : <BuscadorJugador label="Jugador 1" onResult={setJ1} accentClass="text-blue-500" />}
+            ) : <BuscadorJugador label="Jugador 1" onResult={setJ1} accentClass="text-blue-500" cache={cache} setCache={setCache} otroJugador={j2} />}
           </div>
           <div className="bg-zinc-900/50 border border-orange-900/40 rounded-2xl p-6">
             {j2 ? (
@@ -233,7 +277,7 @@ export default function Home() {
                   Cambiar jugador
                 </button>
               </div>
-            ) : <BuscadorJugador label="Jugador 2" onResult={setJ2} accentClass="text-orange-500" />}
+            ) : <BuscadorJugador label="Jugador 2" onResult={setJ2} accentClass="text-orange-500" cache={cache} setCache={setCache} otroJugador={j1} />}
           </div>
         </div>
 

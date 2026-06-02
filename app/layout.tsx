@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Image from "next/image";
 import "./globals.css";
 import { auth, signOut } from "@/auth";
+import { Providers } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -101,7 +102,7 @@ export default async function RootLayout({
           </header>
         )}
 
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
