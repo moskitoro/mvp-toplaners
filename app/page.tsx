@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { buscarJugador, crearAnalisis, getHistorialAnalisis } from '@/lib/actions'
+import { buscarJugador, crearAnalisis, getHistorialAnalisis, getAnalisisIA } from '@/lib/actions'
 import { REGIONS } from '@/lib/riot'
 
 const REGION_OPTIONS = Object.entries(REGIONS).map(([key, val]) => ({ key, label: val.label }))
@@ -130,6 +130,8 @@ export default function Home() {
   const [analisisId, setAnalisisId] = useState<number | null>(null)
   const [historial, setHistorial] = useState<AnalisisGuardado[]>([])
   const [showHistorial, setShowHistorial] = useState(false)
+  const [iaResult, setIaResult] = useState<any>(null)
+  const [loadingIA, setLoadingIA] = useState(false)
 
   const cargarHistorial = async () => {
     const data = await getHistorialAnalisis()
@@ -144,8 +146,15 @@ export default function Home() {
       const [name2, tag2] = j2.riotId.split('#')
       const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
       const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
-      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(res => {
-        if (res && !res.error) setAnalisisId(res.id)
+      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(async res => {
+        if (res && !res.error) {
+          setAnalisisId(res.id)
+          // Pedir análisis IA automáticamente
+          setLoadingIA(true)
+          const ia = await getAnalisisIA(res.id)
+          setIaResult(ia)
+          setLoadingIA(false)
+        }
         setGuardando(false)
         cargarHistorial()
       })
@@ -254,6 +263,68 @@ export default function Home() {
                   v2={(j2.metricas as any)[dim.key]} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ANÁLISIS IA */}
+        {j1 && j2 && (
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-3xl p-8 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Análisis IA · Gemini</h2>
+            </div>
+
+            {loadingIA && (
+              <div className="flex items-center gap-3 text-zinc-500 text-sm">
+                <div className="w-4 h-4 rounded-full border-2 border-zinc-700 border-t-blue-500 animate-spin" />
+                Gemini está analizando los datos...
+              </div>
+            )}
+
+            {iaResult && !loadingIA && (
+              <div className="space-y-5">
+                {/* Resumen principal */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <p className="text-zinc-300 text-sm leading-relaxed">{iaResult.resumen}</p>
+                </div>
+
+                {/* Fortalezas y debilidades */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{j1.riotId.split('#')[0]}</p>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+                      <div className="flex gap-2 items-start">
+                        <span className="text-green-500 text-xs mt-0.5">↑</span>
+                        <p className="text-zinc-300 text-xs">{iaResult.fortaleza_j1}</p>
+                      </div>
+                      <div className="flex gap-2 items-start">
+                        <span className="text-red-500 text-xs mt-0.5">↓</span>
+                        <p className="text-zinc-500 text-xs">{iaResult.debilidad_j1}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{j2.riotId.split('#')[0]}</p>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+                      <div className="flex gap-2 items-start">
+                        <span className="text-green-500 text-xs mt-0.5">↑</span>
+                        <p className="text-zinc-300 text-xs">{iaResult.fortaleza_j2}</p>
+                      </div>
+                      <div className="flex gap-2 items-start">
+                        <span className="text-red-500 text-xs mt-0.5">↓</span>
+                        <p className="text-zinc-500 text-xs">{iaResult.debilidad_j2}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recomendación de scouting */}
+                <div className="border border-blue-900/50 bg-blue-950/20 rounded-2xl p-5">
+                  <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Recomendación de Scouting</p>
+                  <p className="text-zinc-300 text-sm">{iaResult.recomendacion}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -66,6 +66,17 @@ export async function getReporte(id: number) {
   }
 }
 
+// ── Análisis con Gemini AI ────────────────────────────────────────────────────
+export async function getAnalisisIA(id: number) {
+  try {
+    const res = await fetch(`${API_URL}/api/analisis/${id}/ia`, { cache: 'no-store' })
+    const data = await res.json()
+    return data.ok ? data.data : null
+  } catch {
+    return null
+  }
+}
+
 // ── Métricas para visualización en el frontend ───────────────────────────────
 // El backend guarda en BD; el front calcula independientemente para la UI
 import { getPUUID, getMatchIds, getMatch, calcularMetricas, REGIONS } from './riot'
