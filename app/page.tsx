@@ -219,16 +219,23 @@ export default function Home() {
     }
   }, [j1, j2])
 
-  // Guardar en historial del usuario (botón manual)
+  // Guardar en historial del usuario (botón manual) — pasa métricas del frontend
   const handleGuardar = async () => {
-    if (!userEmail) return
-    if (!j1 || !j2) return
+    if (!userEmail || !j1 || !j2) return
     setGuardando(true)
     const [name1, tag1] = j1.riotId.split('#')
     const [name2, tag2] = j2.riotId.split('#')
     const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
     const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
-    const res = await crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2, userEmail)
+    const minP = Math.min(j1.partidasAnalizadas, j2.partidasAnalizadas)
+    const res = await crearAnalisis(
+      `${name1}#${tag1}`, r1,
+      `${name2}#${tag2}`, r2,
+      userEmail,
+      { ...j1.metricas, puuid: j1.puuid, partidasAnalizadas: j1.partidasAnalizadas },
+      { ...j2.metricas, puuid: j2.puuid, partidasAnalizadas: j2.partidasAnalizadas },
+      minP
+    )
     if (res && !res.error) {
       setAnalisisGuardado(true)
       await cargarHistorial(userEmail)

@@ -27,13 +27,16 @@ export async function buscarJugador(riotId: string, region: string) {
 export async function crearAnalisis(
   riotId1: string, region1: string,
   riotId2: string, region2: string,
-  emailUsuario?: string
+  emailUsuario?: string,
+  metricas1?: any,
+  metricas2?: any,
+  partidasN?: number
 ) {
   try {
     const res = await fetch(`${API_URL}/api/analisis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ riotId1, region1, riotId2, region2, emailUsuario }),
+      body: JSON.stringify({ riotId1, region1, riotId2, region2, emailUsuario, metricas1, metricas2, partidasN }),
       cache: 'no-store',
     })
     const data = await res.json()

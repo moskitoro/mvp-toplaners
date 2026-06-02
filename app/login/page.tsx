@@ -29,9 +29,6 @@ export default function LoginPage() {
         <div className="w-full bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm flex flex-col gap-6">
           <div className="text-center">
             <h1 className="text-white font-bold text-lg">Accede a tu cuenta</h1>
-            <p className="text-zinc-500 text-xs mt-1">
-              Solo el equipo autorizado puede entrar
-            </p>
           </div>
 
           {/* BOTÓN GOOGLE */}
@@ -59,7 +56,7 @@ export default function LoginPage() {
 
         {/* FOOTER */}
         <p className="text-zinc-700 text-[10px] uppercase tracking-widest text-center">
-          TopGap © 2025 · League Analytics
+          Oscar Julian Toro Arroyave · Estructura de Datos 2026
         </p>
       </div>
     </main>
