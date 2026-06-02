@@ -281,7 +281,7 @@ export default function Home() {
             ) : (
               <div className="space-y-2">
                 {historial.map(a => (
-                  <div key={a.id} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 group">
+                  <div key={a.id} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
                     <div>
                       <p className="text-sm font-bold text-white">{a.titulo}</p>
                       <p className="text-[10px] text-zinc-600">{new Date(a.creado_en).toLocaleString('es-CO')} · {a.partidas_n} partidas</p>
@@ -293,13 +293,12 @@ export default function Home() {
                           <p className="text-[10px] text-zinc-600">+{a.diferencia} pts</p>
                         </div>
                       )}
-                      {/* Fix 5: botón eliminar */}
                       <button
                         onClick={() => handleEliminar(a.id)}
                         title="Eliminar análisis"
-                        className="text-zinc-700 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 text-sm leading-none"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-red-900/60 border border-zinc-700 hover:border-red-700 text-zinc-500 hover:text-red-400 transition-all text-xs"
                       >
-                        🗑
+                        ✕
                       </button>
                     </div>
                   </div>
