@@ -205,7 +205,7 @@ export default function Home() {
       const [name2, tag2] = j2.riotId.split('#')
       const r1 = Object.entries(REGIONS).find(([,v]) => v.label === j1.region)?.[0] || 'la1'
       const r2 = Object.entries(REGIONS).find(([,v]) => v.label === j2.region)?.[0] || 'la1'
-      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2).then(async res => {
+      crearAnalisis(`${name1}#${tag1}`, r1, `${name2}#${tag2}`, r2, userEmail).then(async res => {
         if (res && !res.error) {
           setAnalisisGuardado(true)
           // Fix 4a: recargar historial inmediatamente tras guardar
