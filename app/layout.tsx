@@ -58,22 +58,31 @@ export default async function RootLayout({
 
             {/* USUARIO */}
             <div className="flex items-center gap-3">
-              {session.user.image ? (
-                <Image
-                  src={session.user.image}
-                  alt={session.user.name ?? ""}
-                  width={32}
-                  height={32}
-                  className="rounded-full border border-zinc-700"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                  {session.user.name?.[0]?.toUpperCase() ?? "?"}
+              <div className="flex items-center gap-2">
+                {session.user.image ? (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name ?? ""}
+                    width={32}
+                    height={32}
+                    className="rounded-full border border-zinc-700"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                    {session.user.name?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+                <div className="hidden sm:flex flex-col">
+                  <span className="text-xs text-zinc-300 font-medium leading-tight">
+                    {session.user.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-600 leading-tight">
+                    {session.user.email}
+                  </span>
                 </div>
-              )}
-              <span className="text-xs text-zinc-400 hidden sm:block font-medium">
-                {session.user.name}
-              </span>
+              </div>
+
+              {/* Cambiar cuenta */}
               <form
                 action={async () => {
                   "use server";
@@ -82,6 +91,7 @@ export default async function RootLayout({
               >
                 <button
                   type="submit"
+                  title="Cambiar cuenta o salir"
                   className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-red-400 transition-colors border border-zinc-800 hover:border-red-900 px-3 py-1.5 rounded-lg"
                 >
                   Salir
